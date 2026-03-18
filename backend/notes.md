@@ -113,3 +113,6 @@ session me hm
 - updatedAt
 - revoke => it is bydefault false but agr true ho gya to jo bhi refresh token hoga hm use dubara use nhi kr skte accesstoken ko use krne ke liye and agr access token nhi hoga to hm server pe login nhi kr skte 
 }
+
+### token blacklisting
+
