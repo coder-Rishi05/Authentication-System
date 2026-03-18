@@ -2,6 +2,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import userModel from "../models/user.model.js";
 import { jwt_secret } from "../constant/constant.js";
+import sessionModel from "../models/session.model.js";
+import crypto from "node:crypto";
 
 export const register = async (req, res) => {
   try {
@@ -27,12 +29,29 @@ export const register = async (req, res) => {
       password: hasspwd,
     });
 
-    const acessToken = jwt.sign({ id: user._id }, jwt_secret, {
-      expiresIn: "15m",
-    });
     const refreshToken = jwt.sign({ id: user._id }, jwt_secret, {
       expiresIn: "7d",
     });
+
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await sessionModel.create({
+      user: user._id,
+      refreshTokenHash: refreshTokenHash,
+      ip: req.ip,
+      userAgent: req.headers["user-agent"],
+    });
+
+    const acessToken = jwt.sign(
+      { id: user._id, sessionId: session._id },
+      jwt_secret,
+      {
+        expiresIn: "15m",
+      },
+    );
 
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
@@ -87,6 +106,20 @@ export const refreshToken = async (req, res) => {
 
   const decoded = jwt.verify(refreshToken, jwt_secret);
 
+  const refreshTokenHash = crypto
+    .createHash("sha256")
+    .update(refreshToken)
+    .digest("hex");
+
+  const session = await sessionModel.findOne({
+    refreshTokenHash,
+    revoked: false,
+  });
+
+  if (!session) {
+    return res.status(401).json({ message: "Invalid refresh token" });
+  }
+
   const accessToken = jwt.sign({ id: decoded.id }, jwt_secret, {
     expiresIn: "15m",
   });
@@ -94,6 +127,11 @@ export const refreshToken = async (req, res) => {
   const newRefreshToken = jwt.sign({ id: decoded.id }, jwt_secret, {
     expiresIn: "7d",
   });
+
+  const newRefreshTokenHash = crypto.createHash("sha256").update(newRefreshToken).digest("hex");
+
+  session.refreshTokenHash = newRefreshTokenHash;
+  await session.save();
 
   res.cookie("refreshToken", newRefreshToken, {
     httpOnly: true,
@@ -109,4 +147,36 @@ export const refreshToken = async (req, res) => {
 
 export const login = async () => {};
 
-export const logout = async () => {};
+export const logout = async () => {
+  try {
+    const refreshToken = req.cookies.refreshToken;
+
+    if (!refreshToken) {
+      return res.status(400).json({ message: "token not found" });
+    }
+
+    const refreshTokenHash = crypto
+      .createHash("sha256")
+      .update(refreshToken)
+      .digest("hex");
+
+    const session = await sessionModel.findOne({
+      refreshToken,
+      revoked: false,
+    });
+
+    if (!session) {
+      return res.status(400).json({ message: "Invalid refresh token" });
+    }
+
+    session.revoked = true;
+    await session.save();
+
+    res.clearCookie("refreshToken");
+
+    res.status(200).json({ message: "Logout successfully" });
+  } catch (error) {
+    console.log(error);
+    return res.status(500).json({ message: "server error" });
+  }
+};

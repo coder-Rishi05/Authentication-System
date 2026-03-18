@@ -98,4 +98,18 @@ export const refreshToken = async (req, res) => {
 ---
 ### Logout from all devices
 
-- accessToken use krte han user
+- accessToken use krte han user ko server pe authenticate krne ke liye.
+- refresh token accesstoken ko dubara generate krne ke liye.
+
+user basically diffrent different devices use krta hai to hm hr ek device ke liye session maintain krte hn 
+session me hm 
+
+{
+- id
+- then refreshtoken ko store krte han with hashFormat
+- ip
+- userAgent => browser
+- createdAt
+- updatedAt
+- revoke => it is bydefault false but agr true ho gya to jo bhi refresh token hoga hm use dubara use nhi kr skte accesstoken ko use krne ke liye and agr access token nhi hoga to hm server pe login nhi kr skte 
+}
