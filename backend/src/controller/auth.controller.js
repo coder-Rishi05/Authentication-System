@@ -16,7 +16,7 @@ export const register = async (req, res) => {
     });
 
     if (isAlreadyExist) {
-      return res.staus(409).json({ message: "User already exist" });
+      return res.status(409).json({ message: "User already exist" });
     }
 
     const hasspwd = await bcrypt.hash(password, 10);
@@ -76,6 +76,35 @@ export const getMe = async (req, res) => {
     console.log(error);
     return res.status(500).json({ message: "server error" });
   }
+};
+
+// to generate new acess token
+export const refreshToken = async (req, res) => {
+  const refreshToken = req.cookies.refreshToken;
+  if (!refreshToken) {
+    return res.status(401).json({ message: "Unauthorised" });
+  }
+
+  const decoded = jwt.verify(refreshToken, jwt_secret);
+
+  const accessToken = jwt.sign({ id: decoded.id }, jwt_secret, {
+    expiresIn: "15m",
+  });
+
+  const newRefreshToken = jwt.sign({ id: decoded.id }, jwt_secret, {
+    expiresIn: "7d",
+  });
+
+  res.cookie("refreshToken", newRefreshToken, {
+    httpOnly: true,
+    secure: true,
+    sameSite: "strict",
+    maxAge: 7 * 24 * 60 * 60 * 1000,
+  });
+
+  res
+    .status(200)
+    .json({ message: "Access token refreshed successfully", accessToken });
 };
 
 export const login = async () => {};
